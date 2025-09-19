@@ -1,0 +1,9 @@
+[package]
+name = "hype"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1.47.1", features = ["full"] }
+wasmtime = "36.0.2"
+wasmtime-wasi = "36.0.2"
