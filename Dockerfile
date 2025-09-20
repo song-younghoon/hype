@@ -23,5 +23,5 @@ ENV PATH="/root/.wasmtime/bin:${PATH}"
 WORKDIR /usr/app
 COPY ./ ./
 
-RUN clang++ -std=c++17 -o ./cpp/get_current_unixtime.wasm ./cpp/get_current_unixtime.cpp
-
+RUN clang++ -std=c++17 -O3 -flto -o ./cpp/get_current_unixtime.wasm ./cpp/get_current_unixtime.cpp
+RUN wasmtime compile ./cpp/get_current_unixtime.wasm -o ./cpp/get_current_unixtime.cwasm
