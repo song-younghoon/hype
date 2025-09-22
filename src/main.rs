@@ -13,6 +13,11 @@ pub struct ComponentRunStates {
     pub resource_table: ResourceTable,
 }
 
+pub struct Context {
+    pub instance: Instance,
+    pub store: Store<ComponentRunStates>,
+}
+
 impl WasiView for ComponentRunStates {
     fn ctx(&mut self) -> WasiCtxView<'_> {
         WasiCtxView {
@@ -34,7 +39,7 @@ static WASM_LINKER_PROTOTYPE: Lazy<Linker<ComponentRunStates>> = Lazy::new(|| {
     return linker;
 });
 
-async fn build_instance(component: &Component) -> (Instance, Store<ComponentRunStates>) {
+async fn build_context(component: &Component) -> Context {
     let linker = WASM_LINKER_PROTOTYPE.clone();
 
     let wasi = WasiCtx::builder().inherit_stdio().inherit_args().build();
@@ -49,25 +54,23 @@ async fn build_instance(component: &Component) -> (Instance, Store<ComponentRunS
         .await
         .unwrap();
 
-    return (instance, store);
+    return Context { instance, store };
 }
 
-async fn run_func(
-    instance: &Instance,
-    store: &mut Store<ComponentRunStates>,
-) -> std::result::Result<(), Box<dyn std::error::Error>> {
-    let func = instance
-        .get_typed_func::<(), (i32,)>(&mut *store, "get-current-unixtime")
+async fn run_func(context: &mut Context) -> std::result::Result<(), Box<dyn std::error::Error>> {
+    let func = context
+        .instance
+        .get_typed_func::<(), (i32,)>(&mut context.store, "get-current-unixtime")
         .unwrap();
 
-    let unixtime = func.call_async(&mut *store, ()).await?;
+    let unixtime = func.call_async(&mut context.store, ()).await?;
     println!("unixtime is {}", unixtime.0);
-    func.post_return_async(&mut *store).await?;
+    func.post_return_async(&mut context.store).await?;
 
     Ok(())
 }
 
-static SHARED_INSTANCE: Lazy<Arc<Mutex<(Instance, Store<ComponentRunStates>)>>> = Lazy::new(|| {
+static SHARED_CONTEXT: Lazy<Arc<Mutex<Context>>> = Lazy::new(|| {
     let component = unsafe {
         Component::deserialize_file(&WASM_ENGINE, "./HypeDotnetApp/bin/HypeDotnetApp.cwasm")
     }
@@ -75,7 +78,7 @@ static SHARED_INSTANCE: Lazy<Arc<Mutex<(Instance, Store<ComponentRunStates>)>>> 
 
     tokio::task::block_in_place(|| {
         tokio::runtime::Handle::current()
-            .block_on(async { Arc::new(Mutex::new(build_instance(&component).await)) })
+            .block_on(async { Arc::new(Mutex::new(build_context(&component).await)) })
     })
 });
 
@@ -86,12 +89,10 @@ async fn main() {
 
     for _ in 0..task_count {
         let task = tokio::spawn(async {
-            let shard_instance_clone = SHARED_INSTANCE.clone();
-            let mut guard = shard_instance_clone.lock().await;
+            let shard_context_clone = SHARED_CONTEXT.clone();
+            let mut guard = shard_context_clone.lock().await;
 
-            let (instance, store) = &mut *guard;
-
-            if let Err(e) = run_func(instance, store).await {
+            if let Err(e) = run_func(&mut *guard).await {
                 eprintln!("Error running WASM: {}", e);
             }
         });
