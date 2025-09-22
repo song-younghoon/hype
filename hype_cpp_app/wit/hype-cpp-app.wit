@@ -1,0 +1,5 @@
+package hype-cpp-app:core;
+
+world application {
+  export get-current-unixtime: func() -> s32;
+}

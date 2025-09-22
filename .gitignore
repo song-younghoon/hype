@@ -1,3 +1,4 @@
+# Rust
 debug/
 target/
 **/*.rs.bk
@@ -5,3 +6,10 @@ target/
 **/mutants.out*/
 .idea/
 X_*
+
+# CPP
+build/
+
+# .NET
+obj/
+bin/

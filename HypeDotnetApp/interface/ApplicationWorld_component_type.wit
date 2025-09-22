@@ -1,0 +1,5 @@
+package hype-dotnet-app:core;
+
+world application {
+  export get-current-unixtime: func() -> s32;
+}
